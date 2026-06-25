@@ -1,0 +1,19 @@
+preprocessing:
+  lowercase: true
+  remove_punctuation: true
+
+retrieval:
+  top_k: 10
+  models:
+    - tfidf
+    - bm25
+    - embedding
+    - hybrid_serial
+    - hybrid_parallel
+
+evaluation:
+  metrics:
+    - map
+    - recall
+    - precision_at_10
+    - ndcg

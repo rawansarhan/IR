@@ -1,0 +1,14 @@
+datasets:
+  quora:
+    id: beir/quora/test
+    description: Duplicate question retrieval on Quora questions
+    docs: 522931
+    queries: 10000
+
+  touche:
+    id: beir/webis-touche2020
+    description: Argument retrieval for debate topics
+    docs: 382545
+    queries: 49
+
+default: touche

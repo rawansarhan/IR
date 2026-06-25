@@ -1,0 +1,11 @@
+ir-datasets
+scikit-learn
+rank-bm25
+sentence-transformers
+fastapi
+uvicorn
+streamlit
+pyyaml
+numpy
+joblib
+pandas
