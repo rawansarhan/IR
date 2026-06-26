@@ -27,9 +27,12 @@ for _pkg in ("stopwords", "wordnet", "omw-1.4", "punkt", "punkt_tab"):
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-
+# استخدمنا ال set لان البحث فيها اسرع من ال list
+# مجموعة كلمات الللغة الانكليزية
 _STOPWORDS = set(stopwords.words("english"))
+# تستخدم لتخفسض الكلمات الى اساسية  مثل running => run
 _STEMMER = PorterStemmer()
+# اداة الاشتقاق المعجمي 
 _LEMMATIZER = WordNetLemmatizer()
 
 
@@ -48,26 +51,26 @@ def preprocess_text(
     if lowercase:
         text = text.lower()
 
-    # 2. Remove punctuation and digits
+    # 2. Remove punctuation and digits (ازالة الترقيم والارقام)
     if remove_punctuation:
         text = text.translate(str.maketrans("", "", string.punctuation + string.digits))
 
-    # 3. Normalize whitespace
+    # 3. Normalize whitespace (تسوية المسافات الزائدة)
     text = re.sub(r"\s+", " ", text).strip()
 
-    # 4. Tokenize
+    # 4. Tokenize (تقسيم النص لكلمات)
     tokens = word_tokenize(text)
 
-    # 5. Remove stopwords
+    # 5. Remove stopwords (ازالة الكلمات الشائعة بلا معنى)
     if remove_stopwords:
         tokens = [t for t in tokens if t not in _STOPWORDS]
 
-    # 6. Lemmatize first (needs real words)
+    # 6. Lemmatize first (needs real words) (تجويل الكلمات الى الجذر)
     if lemmatize:
         tokens = [_LEMMATIZER.lemmatize(t) for t in tokens]
 
-    # 7. Stem after lemmatize
+    # 7. Stem after lemmatize (قص نهايات الجذر )
     if stem:
         tokens = [_STEMMER.stem(t) for t in tokens]
-
+  # اعادة تجميع القائمة لنص واحد => (["water", "ban"] → "water ban".)
     return " ".join(tokens)

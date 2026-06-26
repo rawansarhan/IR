@@ -20,12 +20,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from core.dataset_loader import build_corpus, load_qrels, load_queries
+from services.clustering import cluster_documents, load_clusters, save_clusters
 from services.document_store import DocumentStore
 from services.evaluation import evaluate_run
 from services.indexing import InvertedIndex
 from services.persistence import (
     build_and_save_all_models,
     index_exists,
+    load_embedding,
     load_index,
     load_retriever,
     model_exists,
@@ -34,6 +36,8 @@ from services.persistence import (
 )
 from services.query_processing import log_query_transformation
 from services.query_refinement import refine_query
+from services.retrieval import VectorStoreRetriever
+from services.vector_store import FaissVectorStore
 
 app = FastAPI(title="IR Project API", version="1.0.0")
 
@@ -100,6 +104,25 @@ def _api_retriever_key(dataset: str, model: str, **params) -> str:
     return f"{dataset}:{retriever_cache_key(model, **params)}"
 
 
+def _get_vector_store_retriever(dataset: str) -> VectorStoreRetriever:
+    """Load FAISS vector store from disk and wrap in a retriever."""
+    key = f"{dataset}:vector_store"
+    if key in _retrievers:
+        return _retrievers[key]
+
+    store = FaissVectorStore.load(dataset)
+    if store is None:
+        raise HTTPException(
+            400,
+            f"Vector store for '{dataset}' not built. Call POST /load or POST /vector-store/{dataset}.",
+        )
+    r = VectorStoreRetriever()
+    r.doc_ids = store.doc_ids
+    r._store = store
+    _retrievers[key] = r
+    return r
+
+
 def _get_retriever(
     dataset: str,
     model: str,
@@ -108,6 +131,9 @@ def _get_retriever(
     **params,
 ) -> object:
     """Load retriever from memory or disk. Never fit on first search."""
+    if model == "vector_store":
+        return _get_vector_store_retriever(dataset)
+
     key = _api_retriever_key(
         dataset, model,
         k1=params.get("k1", 1.5), b=params.get("b", 0.75),
@@ -152,6 +178,27 @@ def _ensure_index(dataset: str, doc_ids: List[str], texts: List[str], rebuild: b
     save_index(dataset, idx)
     _indexes[dataset] = idx
     return idx
+
+
+def _build_vector_store(dataset: str, rebuild: bool = False) -> bool:
+    """Build FAISS vector store by reusing already-computed embeddings."""
+    if not rebuild and FaissVectorStore.exists(dataset):
+        return True
+
+    emb_retriever = load_embedding(dataset)
+    if emb_retriever is None or emb_retriever.doc_embeddings is None:
+        return False
+
+    store = FaissVectorStore()
+    store.build(emb_retriever.doc_ids, emb_retriever.doc_embeddings)
+    store.save(dataset)
+
+    # warm memory cache
+    r = VectorStoreRetriever()
+    r.doc_ids = store.doc_ids
+    r._store = store
+    _retrievers[f"{dataset}:vector_store"] = r
+    return True
 
 
 # ── Endpoints ────────────────────────────────────────────────────────
@@ -249,6 +296,12 @@ def load_dataset(req: LoadRequest):
             key = _api_retriever_key(req.dataset, model, **params)
             _retrievers[key] = load_retriever(req.dataset, model, **params)
 
+    # 5) Build FAISS vector store (reuses embeddings — fast)
+    t5 = time.time()
+    vs_ok = _build_vector_store(req.dataset, rebuild=req.rebuild)
+    steps["vector_store_sec"] = round(time.time() - t5, 2)
+    steps["vector_store"] = "ready" if vs_ok else "skipped"
+
     elapsed = round(time.time() - t0, 2)
     return {
         "dataset": req.dataset,
@@ -257,6 +310,7 @@ def load_dataset(req: LoadRequest):
         "elapsed_sec": elapsed,
         "storage": "sqlite",
         "models_prebuilt": True,
+        "vector_store": vs_ok,
         "steps": steps,
     }
 
@@ -471,3 +525,62 @@ def get_doc(dataset: str, doc_id: str):
         "length": len(text.split()),
         "source": "sqlite",
     }
+
+
+# ── Extra Feature 1: Vector Store (FAISS) ────────────────────────────
+@app.post("/vector-store/{dataset}")
+def build_vector_store(dataset: str, rebuild: bool = False):
+    """Build FAISS vector store from the dataset's embeddings."""
+    if dataset not in DATASETS:
+        raise HTTPException(404, f"Unknown dataset: {dataset}")
+
+    ok = _build_vector_store(dataset, rebuild=rebuild)
+    if not ok:
+        raise HTTPException(
+            400,
+            f"Cannot build vector store: embeddings for '{dataset}' not found. Call /load first.",
+        )
+    store = FaissVectorStore.load(dataset)
+    return {"dataset": dataset, "status": "ready", **store.stats()}
+
+
+@app.get("/vector-store/{dataset}/stats")
+def vector_store_stats(dataset: str):
+    store = FaissVectorStore.load(dataset)
+    if store is None:
+        raise HTTPException(400, f"Vector store for '{dataset}' not built yet.")
+    return {"dataset": dataset, "status": "ready", **store.stats()}
+
+
+# ── Extra Feature 2: Documents Clustering ────────────────────────────
+@app.post("/cluster/{dataset}")
+def build_clusters(dataset: str, n_clusters: int = 8, rebuild: bool = False):
+    """Cluster documents by topic using KMeans on embeddings."""
+    if not rebuild:
+        cached = load_clusters(dataset)
+        if cached and cached.get("n_clusters") == max(2, n_clusters):
+            return {"cached": True, **cached}
+
+    emb_retriever = load_embedding(dataset)
+    if emb_retriever is None or emb_retriever.doc_embeddings is None:
+        raise HTTPException(
+            400,
+            f"Embeddings for '{dataset}' not found. Call /load first.",
+        )
+
+    doc_ids = emb_retriever.doc_ids
+    texts = [_doc_store.get_document(dataset, d) or "" for d in doc_ids]
+
+    result = cluster_documents(
+        dataset, doc_ids, texts, emb_retriever.doc_embeddings, n_clusters=n_clusters
+    )
+    save_clusters(dataset, result)
+    return {"cached": False, **result}
+
+
+@app.get("/cluster/{dataset}")
+def get_clusters(dataset: str):
+    cached = load_clusters(dataset)
+    if cached is None:
+        raise HTTPException(400, f"Clusters for '{dataset}' not built yet. Call POST /cluster/{dataset}.")
+    return {"cached": True, **cached}

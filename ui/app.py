@@ -80,11 +80,23 @@ MODEL_INFO = {
 
     },
 
+    "vector_store": {
+
+        "name": "Vector Store (FAISS)",
+
+        "matching": "Cosine Similarity عبر فهرس FAISS",
+
+        "ranking": "تنازلي حسب التشابه الدلالي من FAISS",
+
+        "detail": "بحث دلالي سريع باستخدام فهرس FAISS IndexFlatIP بدل ضرب المصفوفة الكامل",
+
+    },
+
 }
 
 
 
-ALL_MODELS = ["tfidf", "bm25", "embedding", "hybrid_serial", "hybrid_parallel"]
+ALL_MODELS = ["tfidf", "bm25", "embedding", "hybrid_serial", "hybrid_parallel", "vector_store"]
 
 
 
@@ -755,5 +767,90 @@ with st.expander("📊 Evaluation & Comparison"):
             else:
 
                 st.dataframe(df, use_container_width=True)
+
+
+# ── Extra Feature 1: Vector Store (FAISS) ────────────────────────────
+st.markdown("---")
+with st.expander("🧬 Vector Store (FAISS) — ميزة إضافية"):
+    st.caption(
+        "فهرس FAISS يخزّن الـ embeddings للبحث الدلالي السريع. "
+        "يُبنى تلقائيًا عند Load Dataset (يعيد استخدام الـ embeddings المحسوبة)."
+    )
+    if st.button("📊 Show Vector Store Stats", use_container_width=True):
+        r = requests.get(f"{API}/vector-store/{dataset}/stats")
+        if r.ok:
+            d = r.json()
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Vectors", f"{d['num_vectors']:,}")
+            c2.metric("Dimension", d["dimension"])
+            c3.metric("Backend", d["backend"])
+            st.success(f"Index type: {d['index_type']}")
+        else:
+            st.error(r.text)
+
+    if st.button("🔄 Rebuild Vector Store", use_container_width=True):
+        with st.spinner("Building FAISS index..."):
+            r = requests.post(f"{API}/vector-store/{dataset}", params={"rebuild": True}, timeout=36000)
+        if r.ok:
+            st.success("✅ Vector store rebuilt")
+        else:
+            st.error(r.text)
+
+    st.info("للبحث عبر الـ Vector Store: اختر النموذج `vector_store` من الـ sidebar.")
+
+
+# ── Extra Feature 2: Documents Clustering ────────────────────────────
+st.markdown("---")
+with st.expander("🗃️ Documents Clustering — ميزة إضافية"):
+    st.caption(
+        "تجميع الوثائق المتشابهة دلاليًا في عناقيد (KMeans على الـ embeddings). "
+        "كل عنقود يظهر أهم كلماته وعدد وثائقه."
+    )
+    n_clusters = st.slider("عدد العناقيد (K)", 2, 20, 8, key="n_clusters")
+
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        if st.button("▶ Run Clustering", use_container_width=True):
+            with st.spinner("Clustering documents..."):
+                r = requests.post(
+                    f"{API}/cluster/{dataset}",
+                    params={"n_clusters": n_clusters, "rebuild": True},
+                    timeout=36000,
+                )
+            if r.ok:
+                st.session_state["clusters"] = r.json()
+            else:
+                st.error(r.text)
+    with col_c2:
+        if st.button("📂 Load Saved Clusters", use_container_width=True):
+            r = requests.get(f"{API}/cluster/{dataset}")
+            if r.ok:
+                st.session_state["clusters"] = r.json()
+            else:
+                st.error(r.text)
+
+    clusters_data = st.session_state.get("clusters")
+    if clusters_data and clusters_data.get("clusters"):
+        st.markdown(
+            f"**{clusters_data['n_clusters']} clusters** على "
+            f"**{clusters_data['total_docs']:,}** وثيقة "
+            f"(inertia: {clusters_data.get('inertia', '-')})"
+        )
+
+        sizes_df = pd.DataFrame(
+            [{"cluster": c["label"], "size": c["size"]} for c in clusters_data["clusters"]]
+        ).set_index("cluster")
+        st.bar_chart(sizes_df)
+
+        for c in clusters_data["clusters"]:
+            with st.container():
+                st.markdown(f"**Cluster {c['cluster_id']}** — {c['size']:,} docs")
+                st.markdown("الكلمات المميّزة: " + "  ".join(f"`{t}`" for t in c["top_terms"]))
+                with st.expander(f"عيّنة وثائق (Cluster {c['cluster_id']})"):
+                    for doc_id in c["sample_doc_ids"]:
+                        full = fetch_full_doc(dataset, doc_id)
+                        st.markdown(f"**`{doc_id}`**")
+                        st.caption((full or "")[:200] + " ...")
+                st.divider()
 
 

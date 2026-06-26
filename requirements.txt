@@ -9,3 +9,5 @@ pyyaml
 numpy
 joblib
 pandas
+faiss-cpu
+nltk
