@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import json
 import math
-from collections import defaultdict
+from collections import defaultdict\
+#لتحديد المسارات المختلفة من البيانات
 from pathlib import Path
+#لتحديد الانواع المختلفة من البيانات 
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from services.preprocessing import preprocess_text
@@ -25,12 +27,13 @@ class InvertedIndex:
     """In-memory inverted index with TF and DF statistics."""
 
     def __init__(self) -> None:
-        # term -> {doc_id -> term_frequency}
+        # term -> {doc_id -> term_frequency} تكرار كل كلمة بكل وثيقة 
         self._index: Dict[str, Dict[str, int]] = defaultdict(dict)
-        # doc_id -> total token count (for BM25 length norm)
+        # doc_id -> total token count (for BM25 length norm) طول كل وثيقة
         self._doc_lengths: Dict[str, int] = {}
         # doc_id -> original position (for ranking stability)
         self._doc_order: List[str] = []
+        #عدد الوثائق الكلي
         self._num_docs: int = 0
 
     # ------------------------------------------------------------------
@@ -41,7 +44,7 @@ class InvertedIndex:
         
         #  تحويل النص الى جملة منفصلة بواسطة فراغات مثل :
         #  "Social Media is harmful" => ["social", "media", "harmful"]
-
+# هون منقيم كل الكلمات يلي مالا داعي لنحصل على index مرتب واصغر
         tokens = preprocess_text(text).split()
         self._doc_lengths[doc_id] = len(tokens)
         if doc_id not in self._doc_order:
@@ -75,15 +78,15 @@ class InvertedIndex:
         if not self._doc_lengths:
             return 0.0
         return sum(self._doc_lengths.values()) / len(self._doc_lengths)
-#لحساب التكرار لكل كلمة بالمستند 
+# لحساب عدد الوثائق يلي فيها الكلمة
     def df(self, term: str) -> int:
         """Document frequency — number of docs containing the term."""
         return len(self._index.get(term, {}))
-
+# لحساب عدد مرات تكرار الكلمة في المستند 
     def tf(self, term: str, doc_id: str) -> int:
         """Term frequency of term in doc."""
         return self._index.get(term, {}).get(doc_id, 0)
-
+# لحساب طول الوثيقة 
     def doc_length(self, doc_id: str) -> int:
         return self._doc_lengths.get(doc_id, 0)
 
@@ -91,18 +94,19 @@ class InvertedIndex:
         """Return posting list {doc_id: tf} for a term."""
         return self._index.get(term, {})
 #لحساب القاموس الكلي
+# كل المصطلحات للتصحيح الاملائي (يستخد في الاقتراحات Query Refinement  )
     def vocabulary(self) -> List[str]:
         return list(self._index.keys())
 
     # ------------------------------------------------------------------
     # TF-IDF scoring from index
     # ------------------------------------------------------------------
-#لحساب النتائج النهائية للبحث 
+    #لحساب النتائج النهائية للبحث 
     def tfidf_scores(self, query_terms: List[str]) -> Dict[str, float]:
         """Compute TF-IDF cosine similarity scores for all matching docs."""
         scores: Dict[str, float] = defaultdict(float)
         N = self._num_docs
-
+#
         for term in query_terms:
             df = self.df(term)
             if df == 0:
@@ -110,7 +114,7 @@ class InvertedIndex:
             idf = math.log((N + 1) / (df + 1)) + 1  # sklearn-style smooth IDF
             for doc_id, tf in self.postings(term).items():
                 scores[doc_id] += tf * idf
-
+#
         return dict(scores)
 
     # ------------------------------------------------------------------

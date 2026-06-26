@@ -23,7 +23,8 @@ class EmbeddingRetriever:
 
     Ranking: ترتيب تنازلي حسب cosine similarity
     """
-
+# model name النموذج المستخدم لتحويل الوثائق الى ال embedding
+# all-MiniLM-L6-v2 <= Sentence Transformers
     def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
         self.model_name = model_name
         self.doc_ids: List[str] = []

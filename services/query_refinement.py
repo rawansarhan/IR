@@ -19,15 +19,16 @@ from services.preprocessing import preprocess_text
 from services.query_processing import process_query
 
 
+# split : يقسم الجملة ويحذف المسافات الزائدة. // strip : حذف المسافات من البداية والنهاية. 
 def normalize_query(query: str) -> str:
     """إزالة المسافات الزائدة وتوحيد الشكل."""
     return " ".join(query.split()).strip()
 
-
+#تقسيم الاستعلام الى كلمات => Running with the dogs=> ["run","dog"]
 def _query_tokens(query: str) -> List[str]:
     return process_query(query).split()
 
-
+# اقتراح مصطلحات من الفهرس من الكلمات التي ليست بالاستعلام  
 def suggest_from_vocabulary(
     query: str,
     vocabulary: List[str],
@@ -37,16 +38,22 @@ def suggest_from_vocabulary(
     اقتراح مصطلحات من مفردات الفهرس غير موجودة بالاستعلام.
     يفضّل المصطلحات الشائعة (أول القائمة = الأكثر تكرارًا).
     """
+    # تحول الاستعلام لsit
     query_lower = set(_query_tokens(query))
     suggestions = []
+    #قترح مصطلحات من الفهرس (غير الموجودة بالاستعلام) — تساعد المستخدم يوسّع بحثه. هاد "query suggestion / formulation assistance" من الـ PDF.
+
+
+    #تمر على جميع كلمات الفهرس.
     for term in vocabulary:
+        #إذا كانت الكلمة  غير موجودة بالاستعلام   و أطول من حرفين تضيفها إلى الاقتراحات.
         if term not in query_lower and len(term) > 2:
             suggestions.append(term)
         if len(suggestions) >= max_suggestions:
             break
     return suggestions
 
-
+# تصحيح الاملائي #
 def spell_correct_query(
     query: str,
     vocabulary: List[str],
@@ -56,39 +63,52 @@ def spell_correct_query(
     تصحيح إملائي بسيط: لكل token نبحث عن أقرب كلمة في الفهرس.
     يرجع الاستعلام المصحّح + قائمة التصحيحات.
     """
+    # تقسيم الاستعلام الى كلمات
     tokens = query.split()
+    # تحول الفهرس الى مجموعة من الكلمات 
     vocab_set = set(vocabulary)
+    #قائمة الكلمات المصححة
     corrected_tokens = []
+    # قائمة التصحيحات
     corrections: List[dict] = []
 
+    # تمر على كل الكلمات بالاستعلام
     for token in tokens:
+        #
         clean = token.lower().strip(string.punctuation)
         if not clean:
+        #
             corrected_tokens.append(token)
             continue
-
+     # اذا كانت الكلمة موجودة بالفهرس نضيفها الى الكلمات المصححة 
         if clean in vocab_set:
             corrected_tokens.append(token)
             continue
-
+       # نبجيث عن الكلمات الاقرب من الفهرس 
         matches = get_close_matches(clean, vocabulary, n=1, cutoff=cutoff)
         if matches:
+            #
             corrected_tokens.append(matches[0])
             corrections.append({"original": token, "corrected": matches[0]})
         else:
             corrected_tokens.append(token)
-
+ #تحويل الكلمات الى استعلام 
     return " ".join(corrected_tokens), corrections
 
-
+ 
 def extract_top_terms_from_docs(texts: List[str], top_n: int = 5) -> List[str]:
     """استخراج أكثر المصطلحات تكرارًا من نصوص الوثائق (لـ PRF)."""
+    # ينشئ كائن من نوع Counter. وظيفته عد التكرار 
     counter: Counter = Counter()
+    # تمر على الوثائق 
     for text in texts:
+    # process_query(text) => يقوم بمعالجة النص مثل lowercase , remove stopword , stemming , lemmatization
+    # split => يقسم النص الى كلمات 
         counter.update(process_query(text).split())
+    # يعيد الكلمات حسب most_common الاعلى تكرارا 
     return [term for term, _ in counter.most_common(top_n)]
 
-
+#
 def pseudo_relevance_expand(
     query: str,
     top_doc_texts: List[str],
@@ -99,7 +119,9 @@ def pseudo_relevance_expand(
     نفترض أن أفضل الوثائق المسترجعة ذات صلة،
     ونضيف أكثر مصطلحاتها تكرارًا للاستعلام.
     """
+    # يستخرج الكلمات الاعلى تكرارا من الوثائق 
     expansion_terms = extract_top_terms_from_docs(top_doc_texts, top_n=max_terms + 5)
+    # يحول الاستعلام 
     query_tokens = set(_query_tokens(query))
     selected = [t for t in expansion_terms if t not in query_tokens][:max_terms]
     if not selected:

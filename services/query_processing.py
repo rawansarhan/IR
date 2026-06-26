@@ -7,7 +7,7 @@ This guarantees alignment between query and document representations.
 """
 #لتحويل البحث الى جملة منفصلة بواسطة فراغات 
 from __future__ import annotations
-#
+# 
 from typing import List, Tuple
 #
 from services.preprocessing import preprocess_text
@@ -32,12 +32,12 @@ def process_query(
         lemmatize=lemmatize,
     )
 
-
+#لتقسيم الاستعلام الى كلمات 
 def tokenize_query(query: str) -> List[str]:
     """Preprocess and tokenize query into terms."""
     return process_query(query).split()
 
-
+#
 def expand_query(query: str, synonyms: dict[str, List[str]] | None = None) -> str:
     """Optional: expand query with synonyms or related terms."""
     if not synonyms:
@@ -49,7 +49,7 @@ def expand_query(query: str, synonyms: dict[str, List[str]] | None = None) -> st
             expanded.extend(synonyms[token])
     return " ".join(expanded)
 
-
+#
 def log_query_transformation(original: str) -> dict:
     """Return a dict showing step-by-step query transformation for the report/UI."""
     import string, re
@@ -58,10 +58,10 @@ def log_query_transformation(original: str) -> dict:
 
     lowered = original.lower()
     steps["lowercase"] = lowered
-
+# ازالة التلرقيم والارقام
     no_punct = lowered.translate(str.maketrans("", "", string.punctuation + string.digits))
     steps["remove_punctuation"] = no_punct
-
+# تقسيم النص لكلمات 
     tokens = no_punct.split()
     try:
         from nltk.corpus import stopwords
@@ -70,7 +70,7 @@ def log_query_transformation(original: str) -> dict:
     except Exception:
         no_stop = tokens
     steps["remove_stopwords"] = " ".join(no_stop)
-
+#تحويل الكلمات لجذر
     try:
         from nltk.stem import WordNetLemmatizer
         lemmatizer = WordNetLemmatizer()
@@ -78,7 +78,7 @@ def log_query_transformation(original: str) -> dict:
     except Exception:
         lemmatized = no_stop
     steps["lemmatize"] = " ".join(lemmatized)
-
+#قص نهايات الجذر 
     try:
         from nltk.stem import PorterStemmer
         stemmer = PorterStemmer()

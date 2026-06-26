@@ -31,20 +31,25 @@ class HybridSerialRetriever:
         self._emb = EmbeddingRetriever()
 
     def fit(self, doc_ids: List[str], texts: List[str]) -> None:
+        #لتخزين الوثائق و النصوص في متغير للاستخدام في البحث 
         self._doc_text_map = dict(zip(doc_ids, texts))
         print("  [Serial Hybrid] Fitting BM25 ...")
+    
         self._bm25.fit(doc_ids, texts)
         print("  [Serial Hybrid] Fitting Embedding ...")
         self._emb.fit(doc_ids, texts)
 
     def search(self, query: str, top_k: int = 10) -> List[Tuple[str, float]]:
         # المرحلة 1: BM25 يجيب أفضل candidate_k وثيقة
+        #[(D18,12),(D41,10),(D7,9)]
         candidates = self._bm25.search(query, top_k=self.candidate_k)
+        #["D18","D41","D7"]
         candidate_ids = [doc_id for doc_id, _ in candidates]
 
         # المرحلة 2: Embedding يعيد ترتيب الـ candidates بـ Cosine Similarity
         candidate_texts = [self._doc_text_map.get(doc_id, "") for doc_id in candidate_ids]
         temp_emb = EmbeddingRetriever(self._emb.model_name)
         temp_emb._model = self._emb._get_model()
+        # لا يبني Embeddings لكل الوثائق بل يبني فقط ل Candidates
         temp_emb.fit(candidate_ids, candidate_texts)
         return temp_emb.search(query, top_k=top_k)

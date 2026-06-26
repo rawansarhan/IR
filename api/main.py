@@ -162,7 +162,7 @@ def _get_retriever(
         f"Call POST /load first (models are pre-built on load, not on search).",
     )
 
-
+#  لتاكد من وجود الفهرس والا يبنيه مرة اخرى
 def _ensure_index(dataset: str, doc_ids: List[str], texts: List[str], rebuild: bool = False) -> InvertedIndex:
     if dataset in _indexes and not rebuild:
         return _indexes[dataset]
@@ -462,7 +462,7 @@ def build_index(dataset: str):
         **summary,
     }
 
-
+#لعرض الملخص للفهرس
 @app.get("/index/{dataset}/stats")
 def index_stats(dataset: str):
     if dataset not in _indexes:
@@ -474,7 +474,7 @@ def index_stats(dataset: str):
     summary = _indexes[dataset].summary()
     return {"dataset": dataset, "status": "ready", "on_disk": index_exists(dataset), **summary}
 
-
+#البحث عم كلمة ضمن الفهرس 
 @app.get("/index/{dataset}/term/{term}")
 def term_lookup(dataset: str, term: str):
     if dataset not in _indexes:

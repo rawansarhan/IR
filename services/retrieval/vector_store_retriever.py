@@ -37,6 +37,7 @@ class VectorStoreRetriever:
         model = self._get_model()
         self.doc_ids = doc_ids
         print(f"  [VectorStore] Encoding {len(texts)} documents ...")
+        # يحول كل الوثائق الى embeddings 
         embeddings = model.encode(
             texts,
             batch_size=batch_size,
@@ -45,7 +46,9 @@ class VectorStoreRetriever:
             normalize_embeddings=True,
         )
         print("  [VectorStore] Building FAISS index ...")
+        # ينشئ قاعدة بيانات FAISS.
         self._store = FaissVectorStore()
+        #هنا يبدأ بناء الـ Index. 
         self._store.build(doc_ids, embeddings)
 
     def fit_from_embeddings(self, doc_ids: List[str], embeddings) -> None:
@@ -60,9 +63,11 @@ class VectorStoreRetriever:
         if self._store is None:
             raise RuntimeError("Vector store retriever is not fitted yet.")
         model = self._get_model()
+        #تحويل الاستعلام الى embedding
         query_emb = model.encode(
             [query],
             convert_to_numpy=True,
             normalize_embeddings=True,
         )
+        # FAISS يقوم بالبحث داخل الـ Index مباشرة.=>Top K
         return self._store.search(query_emb, top_k=top_k)

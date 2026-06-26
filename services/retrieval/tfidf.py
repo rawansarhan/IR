@@ -1,5 +1,6 @@
 """TF-IDF Retriever (Vector Space Model)."""
-
+ #TfidfVectorizer من scikit-learn لحساب TF وIDF وبناء مصفوفة TF-IDF.
+ #cosine_similarity من scikit-learn لحساب التشابه بين الاستعلام والوثائق.
 from __future__ import annotations
 
 from typing import List, Tuple
@@ -25,7 +26,7 @@ class TfidfRetriever:
 
     Ranking: ترتيب تنازلي حسب درجة التشابه
     """
-
+#scikit-learn استخدمنا هذه المكتبة لحساب ال TF , IDF  , TF-IDF Matrix بشكل تلقائي   
     def __init__(self) -> None:
         self.doc_ids: List[str] = []
         self.vectorizer = TfidfVectorizer()
@@ -51,7 +52,7 @@ class TfidfRetriever:
         # تمثيل الاستعلام بنفس طريقة الوثائق
         query_vec = self.vectorizer.transform([preprocess_text(query)])
 
-        # Cosine Similarity بين الاستعلام وكل الوثائق
+        # Cosine Similarity بين الاستعلام وكل الوثائق  مكتبة جاهزة من  scikit-learn 
         scores = cosine_similarity(query_vec, self.doc_matrix).flatten()
 
         # Ranking: ترتيب تنازلي — أعلى score أولًا
