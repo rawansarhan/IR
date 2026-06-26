@@ -357,7 +357,6 @@ python run_evaluation.py --dataset both --models all --mode all --output results
 - FAISS — Facebook AI Similarity Search.
 - Robertson & Zaragoza, *The Probabilistic Relevance Framework: BM25 and Beyond*.
 - scikit-learn (TF-IDF, KMeans), rank-bm25, NLTK.
-
 ---
 
 ## 15. رابط الكود
