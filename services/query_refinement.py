@@ -122,8 +122,11 @@ def pseudo_relevance_expand(
     # يستخرج الكلمات الاعلى تكرارا من الوثائق 
     expansion_terms = extract_top_terms_from_docs(top_doc_texts, top_n=max_terms + 5)
     # يحول الاستعلام 
+    # استخراج كلمات الاستعلام
     query_tokens = set(_query_tokens(query))
+    # يحذف الكلمات الموجودة في الاستعلام من الكلمات الاكثر تكرارا 
     selected = [t for t in expansion_terms if t not in query_tokens][:max_terms]
+    # يرجع الاستعلام الاساسي في حال لم يتم اختيار اي كلمة 
     if not selected:
         return query
     return f"{query} {' '.join(selected)}"
@@ -144,9 +147,11 @@ def refine_query(
         original, normalized, spell_corrected, corrections,
         suggestions, prf_expanded, refined (الاستعلام النهائي)
     """
+    # استخراج الاستعلام الاصلي
     original = query
+    #يمثل النسخة الحالية من الاستعلام 
     normalized = normalize_query(query)
-
+    #
     result: Dict[str, object] = {
         "original": original,
         "normalized": normalized,
