@@ -9,7 +9,12 @@ data/exports/
 data/db/
 data/indexes/
 data/models/
+data/vector_store/
+data/clusters/
 *.npy
+*.npz
 *.pkl
 *.joblib
+*.faiss
+results/*.log
 .DS_Store

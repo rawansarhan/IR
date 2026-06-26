@@ -293,7 +293,9 @@ def load_dataset(req: LoadRequest):
             ("hybrid_serial", {}),
             ("hybrid_parallel", {"bw": 0.4, "ew": 0.6}),
         ]:
+    
             key = _api_retriever_key(req.dataset, model, **params)
+            
             _retrievers[key] = load_retriever(req.dataset, model, **params)
 
     # 5) Build FAISS vector store (reuses embeddings — fast)
